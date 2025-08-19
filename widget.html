@@ -1,3 +1,6 @@
+Here you go — full HTML with ATH using the same `.chg` block style as the others and the old `.ath-badge` removed:
+
+```html
 <!doctype html>
 <html lang="en">
 <head>
@@ -6,7 +9,8 @@
   <title>XRP Widget</title>
   <style>
     :root { --bg:#0f1114; --card:#1a1d22; --muted:#9aa4b2; --fg:#e8eef7; --down:#ec5c5c; --up:#3fb87f; --accent:#2e323a; }
-    *{box-sizing:border-box} body{margin:0;background:transparent;font:14px/1.4 system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif;color:var(--fg);} 
+    *{box-sizing:border-box}
+    body{margin:0;background:transparent;font:14px/1.4 system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif;color:var(--fg);} 
     .card{max-width:760px;margin:24px auto;background:var(--card);border:1px solid #22262e;border-radius:18px;padding:20px;box-shadow:0 10px 30px rgba(0,0,0,.25)}
     header{display:flex;align-items:center;gap:14px;margin-bottom:8px}
     header img{width:42px;height:42px}
@@ -20,12 +24,6 @@
     .price-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
     .price{font-size:36px;font-weight:800;background:#2a2f37;border-radius:10px;padding:8px 14px}
     .changes{display:flex;gap:18px;flex-wrap:wrap;align-items:center;}  
-    .ath-badge{
-      display:inline-flex;
-      align-items:center;
-      justify-content:center;
-      line-height:1;
-    }
     .chg{min-width:72px}
     .chg .k{font-size:12px;color:var(--muted)}
     .chg .v{font-size:18px;font-weight:700}
@@ -34,7 +32,10 @@
     .tile{background:#2a2f37;border-radius:10px;padding:12px}
     .tile .k{font-size:12px;color:var(--muted);margin-bottom:4px}
     .tile .v{font-size:20px;font-weight:800}
-    @media (max-width:720px){.grid{grid-template-columns:repeat(2,1fr)}.meta{grid-template-columns:repeat(3,1fr)}}
+    @media (max-width:720px){
+      .grid{grid-template-columns:repeat(2,1fr)}
+      .meta{grid-template-columns:repeat(3,1fr)}
+    }
     .foot{margin-top:10px;color:#7d8897;font-size:12px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
     a{color:#9cc9ff;text-decoration:none}
   </style>
@@ -62,7 +63,8 @@
         <div class="chg"><div class="k">Week</div><div class="v" id="chg-7d">—</div></div>
         <div class="chg"><div class="k">Month</div><div class="v" id="chg-30d">—</div></div>
         <div class="chg"><div class="k">Year</div><div class="v" id="chg-1y">—</div></div>
-        <div class="ath-badge">ATH <span id="ath">—</span></div>
+        <!-- ATH now uses the same block pattern -->
+        <div class="chg"><div class="k">ATH</div><div class="v" id="ath">—</div></div>
       </div>
     </div>
 
@@ -79,7 +81,7 @@
     </div>
 
     <div class="foot">
-      <div>* Momentum rank = 30‑day performance rank among top 100 coins by market cap. **Year rank = 1‑year performance rank among top 100 coins.</div>
+      <div>* Momentum rank = 30-day performance rank among top 100 coins by market cap. **Year rank = 1-year performance rank among top 100 coins.</div>
       <div>Data: CoinGecko public API.</div>
     </div>
   </div>
@@ -131,7 +133,7 @@
           document.getElementById('mkt-share').textContent = '—';
         }
 
-        // 3) Momentum rank (30‑day performance rank among top 100 by mcap)
+        // 3) Momentum rank (30-day performance rank among top 100 by mcap)
         try{
           const topURL = `https://api.coingecko.com/api/v3/coins/markets?vs_currency=${vs}&order=market_cap_desc&per_page=100&page=1&sparkline=false&price_change_percentage=30d,1y`;
           const top = await fetchJSON(topURL);
@@ -159,3 +161,4 @@
   </script>
 </body>
 </html>
+```

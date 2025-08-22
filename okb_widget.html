@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>XRP Widget</title>
+  <title>OKB Widget</title>
   <style>
     :root { --bg:transparent; --card:#1a1d22; --muted:#9aa4b2; --fg:#e8eef7; --down:#ec5c5c; --up:#3fb87f; --accent:#2e323a; }
     *{box-sizing:border-box}
@@ -41,7 +41,7 @@
   <div class="card" id="widget" data-coin-id="okb" data-vs="usd">
     <header>
       <img id="logo" alt="Coin logo" />
-      <h1 id="title">XRP</h1>
+      <h1 id="title">OKB</h1>
     </header>
 
     <div class="meta">
@@ -101,7 +101,7 @@
 
         if(coin){
           document.getElementById('logo').src = coin.image;
-          document.getElementById('title').textContent = coin.name || 'XRP';
+          document.getElementById('title').textContent = coin.name';
           document.getElementById('price').textContent = fmtUSD(coin.current_price);
           document.getElementById('mcap-rank').textContent = (coin.market_cap_rank ? ('#' + coin.market_cap_rank) : '—');
           document.getElementById('mcap').textContent = fmtUSD(coin.market_cap);

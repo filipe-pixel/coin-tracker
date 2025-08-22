@@ -35,13 +35,12 @@
 
     .row{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;background:#1b2028;border:1px solid #222836;border-radius:12px;padding:8px}
     .rank{width:26px;height:26px;display:grid;place-items:center;background:#2a3140;border-radius:8px;font-size:12px;font-weight:800;color:#b8c3d9}
-    .coin{display:flex;align-items:center;gap:8px;min-width:0}
+    .coin{display:flex;align-items:center;gap:6px;min-width:0}
     .coin img{width:22px;height:22px;border-radius:50%}
-    .name{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .sym{color:var(--muted);font-size:11px;margin-left:6px}
-    .metric{font-weight:800}
+    .sym{font-weight:700;font-size:13px;color:var(--fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .metric{font-weight:800;justify-self:end;text-align:right}
     .muted{color:var(--muted)}
-    .pct{font-weight:800}
+    .pct{font-weight:800;margin-left:4px}
     .up{color:var(--up)}
     .down{color:var(--down)}
 
@@ -77,12 +76,12 @@
       </section>
 
       <section class="card">
-        <h2>Top 5 — Year Rank <span class="muted" title="1-year performance among top 100 by market cap">(1y perf)</span></h2>
+        <h2>Top 5 — Year Rank <span class="muted" title="1-year performance among top 100 by market cap"></span></h2>
         <div class="list" id="list-1y"></div>
       </section>
 
       <section class="card">
-        <h2>Top 5 — Momentum Rank <span class="muted" title="30-day performance among top 100 by market cap">(30d perf)</span></h2>
+        <h2>Top 5 — Momentum Rank <span class="muted" title="30-day performance among top 100 by market cap"></span></h2>
         <div class="list" id="list-30d"></div>
       </section>
     </div>
@@ -119,8 +118,8 @@
       el.innerHTML = `
         <div class="rank">${rank}</div>
         <div class="coin">
-          <img alt="${coin.name}" src="${coin.image}">
-          <div class="name" title="${coin.name}">${coin.name} <span class="sym">${coin.symbol.toUpperCase()}</span></div>
+          <img alt="${coin.symbol.toUpperCase()}" src="${coin.image}">
+          <div class="sym" title="${coin.name}">${coin.symbol.toUpperCase()}</div>
         </div>
         <div class="metric">${metricText}${pct!=null?` <span class="pct ${pct>0?'up':pct<0?'down':''}">${fmtPct(pct)}</span>`:''}</div>
       `;
@@ -144,29 +143,21 @@
         const data = await fetchJSON(url);
         const arr = Array.isArray(data)? data: [];
 
-        // Top 5 by market cap (already sorted desc by API) — safe slice
         const topMcap = arr.slice(0,5);
-
-        // Top 5 by 24h volume
         const topVol = [...arr].sort((a,b)=> (b.total_volume||0) - (a.total_volume||0)).slice(0,5);
-
-        // Top 5 by 1y % change
         const top1y = [...arr]
           .filter(x=> typeof x.price_change_percentage_1y_in_currency === 'number')
           .sort((a,b)=> b.price_change_percentage_1y_in_currency - a.price_change_percentage_1y_in_currency)
           .slice(0,5);
-
-        // Top 5 by 30d % change
         const top30d = [...arr]
           .filter(x=> typeof x.price_change_percentage_30d_in_currency === 'number')
           .sort((a,b)=> b.price_change_percentage_30d_in_currency - a.price_change_percentage_30d_in_currency)
           .slice(0,5);
 
-        // Render lists
         topMcap.forEach((c,i)=> lists.mcap.appendChild(rowEl(i+1, c, fmtUSD(c.market_cap, vs))));
         topVol.forEach((c,i)=> lists.vol.appendChild(rowEl(i+1, c, fmtUSD(c.total_volume, vs))));
-        top1y.forEach((c,i)=> lists.oneY.appendChild(rowEl(i+1, c, fmtUSD(c.current_price, vs), c.price_change_percentage_1y_in_currency)));
-        top30d.forEach((c,i)=> lists.thirtyD.appendChild(rowEl(i+1, c, fmtUSD(c.current_price, vs), c.price_change_percentage_30d_in_currency)));
+        top1y.forEach((c,i)=> lists.oneY.appendChild(rowEl(i+1, c, '', c.price_change_percentage_1y_in_currency)));
+        top30d.forEach((c,i)=> lists.thirtyD.appendChild(rowEl(i+1, c, '', c.price_change_percentage_30d_in_currency)));
 
         const now = new Date();
         updated.textContent = `Updated ${now.toLocaleString()} • vs ${vs.toUpperCase()}`;

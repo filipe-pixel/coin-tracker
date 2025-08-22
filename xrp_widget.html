@@ -38,7 +38,7 @@
   </style>
 </head>
 <body>
-  <div class="card" id="xrp-widget" data-coin-id="ripple" data-vs="usd">
+  <div class="card" id="widget" data-coin-id="ripple" data-vs="usd">
     <header>
       <img id="logo" alt="Coin logo" />
       <h1 id="title">XRP</h1>
@@ -91,8 +91,8 @@
     function paintPct(el, n){ if(!el) return; el.textContent = fmtPct(n); el.classList.remove('up','down'); if(n>0) el.classList.add('up'); else if(n<0) el.classList.add('down'); }
 
     (async function init(){
-      const root = document.getElementById('xrp-widget');
-      const coinId = root.dataset.coinId || 'ripple';
+      const root = document.getElementById('widget');
+      const coinId = root.dataset.coinId;
       const vs = root.dataset.vs || 'usd';
       try {
         // 1) Coin market data (price, changes, ranks, caps, supplies, ath)

@@ -10,6 +10,18 @@
       --card:#161a20;
       --muted:#97a0ad;
       --fg:#e7eef8;
+      --up:#33c27b;<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Winners Dashboard — CoinGecko</title>
+  <style>
+    :root{
+      --bg: #0f1216;
+      --card:#161a20;
+      --muted:#97a0ad;
+      --fg:#e7eef8;
       --up:#33c27b;
       --down:#ee5e5e;
       --accent:#232833;
@@ -76,12 +88,16 @@
       </section>
 
       <section class="card">
-        <h2>Year Return<span class="muted" title="1-year performance among top 100 by market cap"></span></h2>
-        <div class="list" id="list-1y"></div>
+        <h2>Year
+          <span class="muted" title="Return for the prior ~11 months, excluding the last 30 days. Computed as (1+1y)/(1+30d)-1."></span>
+        </h2>
+        <div class="list" id="list-11m"></div>
       </section>
 
       <section class="card">
-        <h2>Momentum<span class="muted" title="30-day performance among top 100 by market cap"></span></h2>
+        <h2>Momentum
+          <span class="muted" title="30-day performance among top 100 by market cap"></span>
+        </h2>
         <div class="list" id="list-30d"></div>
       </section>
     </div>
@@ -117,13 +133,27 @@
       el.className = 'row';
       el.innerHTML = `
         <div class="rank">${rank}</div>
-        <div class="coin">
+        <div class="coin" title="${coin.name}">
           <img alt="${coin.symbol.toUpperCase()}" src="${coin.image}">
           <div class="sym" title="${coin.name}">${coin.symbol.toUpperCase()}</div>
         </div>
         <div class="metric">${metricText}${pct!=null?` <span class="pct ${pct>0?'up':pct<0?'down':''}">${fmtPct(pct)}</span>`:''}</div>
       `;
       return el;
+    }
+
+    // Convert raw % to usable number or null
+    const toPct = n => (typeof n === 'number' && isFinite(n)) ? n : null;
+
+    // Prior ~11 months return (exclude last 30d): (1+1y)/(1+30d) - 1, returned in %
+    function yearEx30d(coin){
+      const r1y = toPct(coin.price_change_percentage_1y_in_currency);
+      const r30 = toPct(coin.price_change_percentage_30d_in_currency);
+      if(r1y == null || r30 == null) return null;
+      const g1y = 1 + r1y/100;
+      const g30 = 1 + r30/100;
+      if(g30 <= 0) return null; // guard against degenerate values
+      return (g1y / g30 - 1) * 100;
     }
 
     async function load(){
@@ -133,7 +163,7 @@
       const lists = {
         mcap: document.getElementById('list-mcap'),
         vol: document.getElementById('list-vol'),
-        oneY: document.getElementById('list-1y'),
+        elevenM: document.getElementById('list-11m'),
         thirtyD: document.getElementById('list-30d')
       };
       Object.values(lists).forEach(l=> l.innerHTML = '');
@@ -145,10 +175,14 @@
 
         const topMcap = arr.slice(0,5);
         const topVol = [...arr].sort((a,b)=> (b.total_volume||0) - (a.total_volume||0)).slice(0,5);
-        const top1y = [...arr]
-          .filter(x=> typeof x.price_change_percentage_1y_in_currency === 'number')
-          .sort((a,b)=> b.price_change_percentage_1y_in_currency - a.price_change_percentage_1y_in_currency)
+
+        // Compute non-overlapping year metric
+        const with11m = arr.map(c => ({...c, pct_11m: yearEx30d(c)}));
+        const top11m = with11m
+          .filter(c => c.pct_11m != null)
+          .sort((a,b)=> b.pct_11m - a.pct_11m)
           .slice(0,5);
+
         const top30d = [...arr]
           .filter(x=> typeof x.price_change_percentage_30d_in_currency === 'number')
           .sort((a,b)=> b.price_change_percentage_30d_in_currency - a.price_change_percentage_30d_in_currency)
@@ -156,7 +190,195 @@
 
         topMcap.forEach((c,i)=> lists.mcap.appendChild(rowEl(i+1, c, fmtUSD(c.market_cap, vs))));
         topVol.forEach((c,i)=> lists.vol.appendChild(rowEl(i+1, c, fmtUSD(c.total_volume, vs))));
-        top1y.forEach((c,i)=> lists.oneY.appendChild(rowEl(i+1, c, '', c.price_change_percentage_1y_in_currency)));
+        top11m.forEach((c,i)=> lists.elevenM.appendChild(rowEl(i+1, c, '', c.pct_11m)));
+        top30d.forEach((c,i)=> lists.thirtyD.appendChild(rowEl(i+1, c, '', c.price_change_percentage_30d_in_currency)));
+
+        const now = new Date();
+        updated.textContent = `Updated ${now.toLocaleString()} • vs ${vs.toUpperCase()}`;
+      }catch(e){
+        console.error(e);
+        updated.textContent = 'Failed to load data (rate limit or network). Try Refresh.';
+        Object.values(lists).forEach(l=>{
+          const d=document.createElement('div'); d.className='muted'; d.textContent='—'; l.appendChild(d);
+        });
+      }
+    }
+
+    document.getElementById('refresh').addEventListener('click', load);
+    document.getElementById('vs').addEventListener('change', load);
+    load();
+  </script>
+</body>
+</html>
+
+      --down:#ee5e5e;
+      --accent:#232833;
+      --border:#202633;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif}
+    .wrap{max-width:1120px;margin:28px auto;padding:0 18px}
+    header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px}
+    h1{font-size:28px;margin:0;font-weight:800;letter-spacing:.3px}
+    .controls{display:flex;gap:10px;align-items:center}
+    select,button{background:var(--accent);border:1px solid var(--border);color:var(--fg);border-radius:10px;padding:8px 10px;font-weight:600}
+    button{cursor:pointer}
+
+    .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+    @media (max-width:1000px){.grid{grid-template-columns:repeat(2,1fr)}}
+    @media (max-width:560px){.grid{grid-template-columns:1fr}}
+
+    .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px 14px 10px;box-shadow:0 10px 30px rgba(0,0,0,.24)}
+    .card h2{margin:4px 2px 10px;font-size:16px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:#c9d3e5}
+    .list{display:flex;flex-direction:column;gap:8px}
+
+    .row{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;background:#1b2028;border:1px solid #222836;border-radius:12px;padding:8px}
+    .rank{width:26px;height:26px;display:grid;place-items:center;background:#2a3140;border-radius:8px;font-size:12px;font-weight:800;color:#b8c3d9}
+    .coin{display:flex;align-items:center;gap:6px;min-width:0}
+    .coin img{width:22px;height:22px;border-radius:50%}
+    .sym{font-weight:700;font-size:13px;color:var(--fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .metric{font-weight:800;justify-self:end;text-align:right}
+    .muted{color:var(--muted)}
+    .pct{font-weight:800;margin-left:4px}
+    .up{color:var(--up)}
+    .down{color:var(--down)}
+
+    footer{margin-top:14px;color:var(--muted);font-size:12px;display:flex;gap:10px;justify-content:space-between;flex-wrap:wrap}
+    a{color:#9cc9ff;text-decoration:none}
+  </style>
+</head>
+<body>
+  <div class="wrap" id="winners" data-vs="usd">
+    <header>
+      <h1>🏆 Winners Dashboard</h1>
+      <div class="controls">
+        <label class="muted" for="vs">vs</label>
+        <select id="vs">
+          <option value="usd" selected>USD</option>
+          <option value="eur">EUR</option>
+          <option value="gbp">GBP</option>
+          <option value="jpy">JPY</option>
+        </select>
+        <button id="refresh">Refresh</button>
+      </div>
+    </header>
+
+    <div class="grid">
+      <section class="card">
+        <h2>Market Cap</h2>
+        <div class="list" id="list-mcap"></div>
+      </section>
+
+      <section class="card">
+        <h2>Volume 24h</h2>
+        <div class="list" id="list-vol"></div>
+      </section>
+
+      <section class="card">
+        <h2>Year (ex 30d)
+          <span class="muted" title="Return for the prior ~11 months, excluding the last 30 days. Computed as (1+1y)/(1+30d)-1."></span>
+        </h2>
+        <div class="list" id="list-11m"></div>
+      </section>
+
+      <section class="card">
+        <h2>Momentum
+          <span class="muted" title="30-day performance among top 100 by market cap"></span>
+        </h2>
+        <div class="list" id="list-30d"></div>
+      </section>
+    </div>
+
+    <footer>
+      <div id="updated">—</div>
+      <div>Data: CoinGecko public API. Rankings computed client-side from the top 100 by market cap.</div>
+    </footer>
+  </div>
+
+  <script>
+    // ---- Helpers ----
+    async function fetchJSON(url){
+      const res = await fetch(url, {headers:{'accept':'application/json'}});
+      if(!res.ok) throw new Error('HTTP '+res.status+': '+url);
+      return res.json();
+    }
+    function fmtUSD(n, vs){
+      if(n==null) return '—';
+      const sym = (vs||'usd').toUpperCase();
+      const abs = Math.abs(n);
+      const prefix = (sym==='USD'?'$':sym+' ');
+      if(abs>=1e12) return prefix+(n/1e12).toFixed(2)+'T';
+      if(abs>=1e9) return prefix+(n/1e9).toFixed(2)+'B';
+      if(abs>=1e6) return prefix+(n/1e6).toFixed(2)+'M';
+      if(abs>=1e3) return prefix+(n/1e3).toFixed(2)+'K';
+      return prefix+Number(n).toLocaleString(undefined,{maximumFractionDigits:2});
+    }
+    function fmtPct(n){ if(n==null) return '—'; const s=n>0?'+':''; return s+n.toFixed(1)+'%'; }
+
+    function rowEl(rank, coin, metricText, pct){
+      const el = document.createElement('div');
+      el.className = 'row';
+      el.innerHTML = `
+        <div class="rank">${rank}</div>
+        <div class="coin" title="${coin.name}">
+          <img alt="${coin.symbol.toUpperCase()}" src="${coin.image}">
+          <div class="sym" title="${coin.name}">${coin.symbol.toUpperCase()}</div>
+        </div>
+        <div class="metric">${metricText}${pct!=null?` <span class="pct ${pct>0?'up':pct<0?'down':''}">${fmtPct(pct)}</span>`:''}</div>
+      `;
+      return el;
+    }
+
+    // Convert raw % to usable number or null
+    const toPct = n => (typeof n === 'number' && isFinite(n)) ? n : null;
+
+    // Prior ~11 months return (exclude last 30d): (1+1y)/(1+30d) - 1, returned in %
+    function yearEx30d(coin){
+      const r1y = toPct(coin.price_change_percentage_1y_in_currency);
+      const r30 = toPct(coin.price_change_percentage_30d_in_currency);
+      if(r1y == null || r30 == null) return null;
+      const g1y = 1 + r1y/100;
+      const g30 = 1 + r30/100;
+      if(g30 <= 0) return null; // guard against degenerate values
+      return (g1y / g30 - 1) * 100;
+    }
+
+    async function load(){
+      const root = document.getElementById('winners');
+      const vs = document.getElementById('vs').value || root.dataset.vs || 'usd';
+      const updated = document.getElementById('updated');
+      const lists = {
+        mcap: document.getElementById('list-mcap'),
+        vol: document.getElementById('list-vol'),
+        elevenM: document.getElementById('list-11m'),
+        thirtyD: document.getElementById('list-30d')
+      };
+      Object.values(lists).forEach(l=> l.innerHTML = '');
+
+      try{
+        const url = `https://api.coingecko.com/api/v3/coins/markets?vs_currency=${vs}&order=market_cap_desc&per_page=100&page=1&sparkline=false&price_change_percentage=30d,1y`;
+        const data = await fetchJSON(url);
+        const arr = Array.isArray(data)? data: [];
+
+        const topMcap = arr.slice(0,5);
+        const topVol = [...arr].sort((a,b)=> (b.total_volume||0) - (a.total_volume||0)).slice(0,5);
+
+        // Compute non-overlapping year metric
+        const with11m = arr.map(c => ({...c, pct_11m: yearEx30d(c)}));
+        const top11m = with11m
+          .filter(c => c.pct_11m != null)
+          .sort((a,b)=> b.pct_11m - a.pct_11m)
+          .slice(0,5);
+
+        const top30d = [...arr]
+          .filter(x=> typeof x.price_change_percentage_30d_in_currency === 'number')
+          .sort((a,b)=> b.price_change_percentage_30d_in_currency - a.price_change_percentage_30d_in_currency)
+          .slice(0,5);
+
+        topMcap.forEach((c,i)=> lists.mcap.appendChild(rowEl(i+1, c, fmtUSD(c.market_cap, vs))));
+        topVol.forEach((c,i)=> lists.vol.appendChild(rowEl(i+1, c, fmtUSD(c.total_volume, vs))));
+        top11m.forEach((c,i)=> lists.elevenM.appendChild(rowEl(i+1, c, '', c.pct_11m)));
         top30d.forEach((c,i)=> lists.thirtyD.appendChild(rowEl(i+1, c, '', c.price_change_percentage_30d_in_currency)));
 
         const now = new Date();

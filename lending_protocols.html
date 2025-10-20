@@ -22,7 +22,6 @@
     .protocol img{width:24px;height:24px;border-radius:0}
     .foot{margin-top:10px;color:#7d8897;font-size:12px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
     a{color:#9cc9ff;text-decoration:none}
-    .notes { white-space: normal; overflow-wrap: anywhere; word-break: break-all; hyphens: auto; }
   </style>
 </head>
 <body>
@@ -36,11 +35,11 @@
       <thead>
         <tr>
           <th>Protocol</th>
+          <th>Est.</th>
+          <th>TVL</th>
           <th>Market Cap</th>
           <th>FDV</th>
           <th>Volume 24h</th>
-          <th>TVL</th>
-          <th>Niche</th>
         </tr>
       </thead>
       <tbody id="table-body">
@@ -58,14 +57,19 @@
       const root = document.getElementById('widget');
       const vs = root.dataset.vs || 'usd';
       const coins = [
-        { id: 'aave', name: 'AAVE', slug: 'aave', notes: 'General-purpose, non-custodial lending & borrowing protocol. Users deposit assets to earn yield, borrow against collateral.' },
-        { id: 'morpho', name: 'MORPHO', slug: 'morpho', notes: 'Enhances existing lending markets like Aave and Compound by implementing a peer-to-peer matching mechanism.' },
-        { id: 'compound-governance-token', name: 'COMPOUND', slug: 'compound-finance', notes: 'Allows users to supply assets to liquidity pools and earn interest or borrow assets by providing collateral.' },
-        { id: 'euler', name: 'EULER', slug: 'euler', notes: 'Offers a wide range of assets for lending and borrowing, with a focus on capital efficiency and risk management.' }
+        { id: 'aave', name: 'Aave', slug: 'aave', foundationYear: '2017' },
+        { id: 'morpho', name: 'Morpho', slug: 'morpho', foundationYear: '2022' },
+        { id: 'spark-2', name: 'SparkLend', slug: 'spark', foundationYear: '2023' },
+        { id: 'just', name: 'JustLend', slug: 'justlend', foundationYear: '2020' },
+        { id: 'kamino', name: 'Kamino Lend', slug: 'kamino-lend', foundationYear: '2022' },
+        { id: 'maple', name: 'Maple', slug: 'maple', foundationYear: '2019' },
+        { id: 'compound-governance-token', name: 'Compound Finance', slug: 'compound-finance', foundationYear: '2017' },
+        { id: 'venus', name: 'Venus', slug: 'venus', foundationYear: '2020' },
+        { id: 'euler', name: 'Euler', slug: 'euler', foundationYear: '2021' }
       ];
       try {
         // Fetch market data for all coins
-        const ids = coins.map(c => c.id).join(',');
+        const ids = coins.map(c => c.id).filter(id => id).join(',');
         const marketsURL = `https://api.coingecko.com/api/v3/coins/markets?vs_currency=${vs}&ids=${encodeURIComponent(ids)}&sparkline=false&price_change_percentage=24h`;
         const marketData = await fetchJSON(marketsURL);
         const marketMap = new Map(marketData.map(coin => [coin.id, coin]));
@@ -88,11 +92,11 @@
           const row = document.createElement('tr');
           row.innerHTML = `
             <td class="protocol"><img src="${market?.image || ''}" alt="${coin.name} logo" /><span>${coin.name}</span></td>
+            <td>${coin.foundationYear || '—'}</td>
+            <td>${fmtUSD(coin.tvl)}</td>
             <td>${fmtUSD(market?.market_cap)}</td>
             <td>${fmtUSD(market?.fully_diluted_valuation)}</td>
             <td>${fmtUSD(market?.total_volume)}</td>
-            <td>${fmtUSD(coin.tvl)}</td>
-            <td class="notes">${coin.notes}</td>
           `;
           tbody.appendChild(row);
         });
@@ -104,11 +108,11 @@
           const row = document.createElement('tr');
           row.innerHTML = `
             <td class="protocol"><img src="" alt="${coin.name} logo" /><span>${coin.name}</span></td>
+            <td>${coin.foundationYear || '—'}</td>
             <td>—</td>
             <td>—</td>
             <td>—</td>
             <td>—</td>
-            <td class="notes">${coin.notes}</td>
           `;
           tbody.appendChild(row);
         });

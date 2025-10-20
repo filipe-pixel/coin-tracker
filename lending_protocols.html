@@ -22,6 +22,9 @@
     .protocol img{width:24px;height:24px;border-radius:0}
     .foot{margin-top:10px;color:#7d8897;font-size:12px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
     a{color:#9cc9ff;text-decoration:none}
+    .sort-controls { display: flex; gap: 10px; margin-bottom: 10px; }
+    button { background: var(--accent); color: var(--fg); border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; }
+    select { background: var(--accent); color: var(--fg); border: 1px solid #22262e; padding: 8px; border-radius: 4px; }
   </style>
 </head>
 <body>
@@ -31,6 +34,21 @@
     </header>
     <div class="section-title">Key Metrics</div>
     <div class="hr"></div>
+    <div class="sort-controls">
+      <select id="sortBy">
+        <option value="name">Protocol</option>
+        <option value="foundationYear">Est.</option>
+        <option value="tvl">TVL</option>
+        <option value="market_cap">Market Cap</option>
+        <option value="fdv">FDV</option>
+        <option value="volume">Volume 24h</option>
+      </select>
+      <select id="sortOrder">
+        <option value="asc">Ascending</option>
+        <option value="desc">Descending</option>
+      </select>
+      <button onclick="sortAndRender()">Sort</button>
+    </div>
     <table>
       <thead>
         <tr>
@@ -51,8 +69,62 @@
     </div>
   </div>
   <script>
+    let coinsData = [];
+    let marketMap = new Map();
+
     async function fetchJSON(url){ const res = await fetch(url, {headers:{'accept':'application/json'}}); if(!res.ok) throw new Error('HTTP '+res.status); return res.json(); }
     function fmtUSD(n){ if(n===null||n===undefined) return '—'; const abs=Math.abs(n); if(abs>=1e12) return '$'+(n/1e12).toFixed(2)+'T'; if(abs>=1e9) return '$'+(n/1e9).toFixed(2)+'B'; if(abs>=1e6) return '$'+(n/1e6).toFixed(2)+'M'; if(abs>=1e3) return '$'+(n/1e3).toFixed(2)+'K'; return '$'+n.toLocaleString(undefined,{maximumFractionDigits:2}); }
+
+    function renderTable(coins) {
+      const tbody = document.getElementById('table-body');
+      tbody.innerHTML = '';
+      coins.forEach(coin => {
+        const market = coin.market;
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td class="protocol"><img src="${market?.image || ''}" alt="${coin.name} logo" /><span>${coin.name}</span></td>
+          <td>${coin.foundationYear || '—'}</td>
+          <td>${fmtUSD(coin.tvl)}</td>
+          <td>${fmtUSD(market?.market_cap)}</td>
+          <td>${fmtUSD(market?.fully_diluted_valuation)}</td>
+          <td>${fmtUSD(market?.total_volume)}</td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+
+    function sortAndRender() {
+      const sortBy = document.getElementById('sortBy').value;
+      const sortOrder = document.getElementById('sortOrder').value;
+      const sorted = [...coinsData].sort((a, b) => {
+        let valA, valB;
+        if (sortBy === 'name') {
+          valA = a.name || '';
+          valB = b.name || '';
+          return sortOrder === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+        } else if (sortBy === 'foundationYear') {
+          valA = parseInt(a.foundationYear || 0);
+          valB = parseInt(b.foundationYear || 0);
+        } else if (sortBy === 'tvl') {
+          valA = a.tvl || 0;
+          valB = b.tvl || 0;
+        } else if (sortBy === 'market_cap') {
+          valA = a.market?.market_cap || 0;
+          valB = b.market?.market_cap || 0;
+        } else if (sortBy === 'fdv') {
+          valA = a.market?.fully_diluted_valuation || 0;
+          valB = b.market?.fully_diluted_valuation || 0;
+        } else if (sortBy === 'volume') {
+          valA = a.market?.total_volume || 0;
+          valB = b.market?.total_volume || 0;
+        }
+        if (isNaN(valA)) valA = 0;
+        if (isNaN(valB)) valB = 0;
+        return sortOrder === 'asc' ? valA - valB : valB - valA;
+      });
+      renderTable(sorted);
+    }
+
     (async function init(){
       const root = document.getElementById('widget');
       const vs = root.dataset.vs || 'usd';
@@ -72,34 +144,20 @@
         const ids = coins.map(c => c.id).filter(id => id).join(',');
         const marketsURL = `https://api.coingecko.com/api/v3/coins/markets?vs_currency=${vs}&ids=${encodeURIComponent(ids)}&sparkline=false&price_change_percentage=24h`;
         const marketData = await fetchJSON(marketsURL);
-        const marketMap = new Map(marketData.map(coin => [coin.id, coin]));
+        marketMap = new Map(marketData.map(coin => [coin.id, coin]));
 
         // Fetch TVL for each protocol
         const tvlPromises = coins.map(async (c) => {
           try {
             const tvl = await fetchJSON(`https://api.llama.fi/tvl/${c.slug}`);
-            return { ...c, tvl };
+            return { ...c, tvl, market: marketMap.get(c.id) };
           } catch {
-            return { ...c, tvl: null };
+            return { ...c, tvl: null, market: marketMap.get(c.id) };
           }
         });
-        const coinsWithTvl = await Promise.all(tvlPromises);
+        coinsData = await Promise.all(tvlPromises);
 
-        // Populate table
-        const tbody = document.getElementById('table-body');
-        coinsWithTvl.forEach(coin => {
-          const market = marketMap.get(coin.id);
-          const row = document.createElement('tr');
-          row.innerHTML = `
-            <td class="protocol"><img src="${market?.image || ''}" alt="${coin.name} logo" /><span>${coin.name}</span></td>
-            <td>${coin.foundationYear || '—'}</td>
-            <td>${fmtUSD(coin.tvl)}</td>
-            <td>${fmtUSD(market?.market_cap)}</td>
-            <td>${fmtUSD(market?.fully_diluted_valuation)}</td>
-            <td>${fmtUSD(market?.total_volume)}</td>
-          `;
-          tbody.appendChild(row);
-        });
+        renderTable(coinsData);
       } catch(err){
         console.error(err);
         // Fill with placeholders on error

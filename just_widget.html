@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>JST Widget</title>
+  <style>
+    :root { --bg:transparent; --card:#1a1d22; --muted:#9aa4b2; --fg:#e8eef7; --down:#ec5c5c; --up:#3fb87f; --accent:#2e323a; }
+    *{box-sizing:border-box}
+    body{margin:0;background:transparent;font:14px/1.4 system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif;color:var(--fg);} 
+    .card{max-width:760px;margin:24px auto;background:var(--card);border:1px solid #22262e;border-radius:18px;padding:20px;box-shadow:0 10px 30px rgba(0,0,0,.25)}
+    header{display:flex;align-items:center;gap:14px;margin-bottom:8px}
+    header img{width:42px;height:42px}
+    header h1{font-size:26px;margin:0;font-weight:700;letter-spacing:.5px}
+    .meta{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:6px 0 18px}
+    .pill{background:var(--accent);border-radius:10px;padding:10px 12px;text-align:center}
+    .pill .k{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+    .pill .v{font-size:18px;font-weight:700}
+    .section-title{font-size:18px;margin:14px 0 8px; font-weight:800}
+    .hr{height:1px;background:#282c35;margin:10px 0}
+    .price-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+    .price{font-size:36px;font-weight:800;background:#2a2f37;border-radius:10px;padding:8px 14px}
+    .changes{display:flex;gap:18px;flex-wrap:wrap;align-items:center;}  
+    .chg{min-width:72px}
+    .chg .k{font-size:12px;color:var(--muted)}
+    .chg .v{font-size:18px;font-weight:700}
+    .up{color:var(--up)} .down{color:var(--down)}
+    .grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-top:8px}
+    .tile{background:#2a2f37;border-radius:10px;padding:12px}
+    .tile .k{font-size:12px;color:var(--muted);margin-bottom:4px}
+    .tile .v{font-size:20px;font-weight:800}
+    @media (max-width:720px){
+      .grid{grid-template-columns:repeat(2,1fr)}
+      .meta{grid-template-columns:repeat(3,1fr)}
+    }
+    .foot{margin-top:10px;color:#7d8897;font-size:12px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+    a{color:#9cc9ff;text-decoration:none}
+  </style>
+</head>
+<body>
+  <div class="card" id="widget" data-coin-id="just" data-vs="usd">
+    <header>
+      <img id="logo" alt="Coin logo" />
+      <h1 id="title">JST</h1>
+    </header>
+
+    <div class="meta">
+      <div class="pill"><div class="k">Market Cap rank</div><div class="v" id="mcap-rank">—</div></div>
+      <div class="pill"><div class="k">Year rank*</div><div class="v" id="y-perf">—</div></div>
+      <div class="pill"><div class="k">Momentum rank**</div><div class="v" id="mom-rank">—</div></div>
+    </div>
+
+    <div class="section-title">Price</div>
+    <div class="hr"></div>
+    <div class="price-row">
+      <div class="price" id="price">—</div>
+      
+      <div class="changes">
+        <div class="chg"><div class="k">24h</div><div class="v" id="chg-24h">—</div></div>
+        <div class="chg"><div class="k">Week</div><div class="v" id="chg-7d">—</div></div>
+        <div class="chg"><div class="k">Month</div><div class="v" id="chg-30d">—</div></div>
+        <div class="chg"><div class="k">Year</div><div class="v" id="chg-1y">—</div></div>
+        <!-- ATH now uses the same block pattern -->
+        <div class="chg"><div class="k">ATH</div><div class="v" id="ath">—</div></div>
+      </div>
+    </div>
+
+    <div class="section-title">Market metrics</div>
+    <div class="hr"></div>
+    <div class="grid">
+      <div class="tile"><div class="k">Market Cap</div><div class="v" id="mcap">—</div></div>
+      <div class="tile"><div class="k">FDV</div><div class="v" id="fdv">—</div></div>
+      <div class="tile"><div class="k">Volume 24h</div><div class="v" id="vol">—</div></div>
+      <div class="tile"><div class="k">Market Share</div><div class="v" id="mkt-share">—</div></div>
+      <div class="tile"><div class="k">Circ. Supply</div><div class="v" id="circ-supply">—</div></div>
+      <div class="tile"><div class="k">Max Supply</div><div class="v" id="max-supply">—</div></div>
+      <div class="tile"><div class="k">% Circulating</div><div class="v" id="circ-pct">—</div></div>
+    </div>
+
+    <div class="foot">
+      <div>* Momentum rank = 30-day performance rank among top 100 coins by market cap. **Year rank = 1-year performance rank among top 100 coins.</div>
+      <div>Data: CoinGecko public API.</div>
+    </div>
+  </div>
+
+  <script>
+    async function fetchJSON(url){ const res = await fetch(url, {headers:{'accept':'application/json'}}); if(!res.ok) throw new Error('HTTP '+res.status); return res.json(); }
+    function fmtUSD(n){ if(n===null||n===undefined) return '—'; const abs=Math.abs(n); if(abs>=1e12) return '$'+(n/1e12).toFixed(2)+'T'; if(abs>=1e9) return '$'+(n/1e9).toFixed(2)+'B'; if(abs>=1e6) return '$'+(n/1e6).toFixed(2)+'M'; if(abs>=1e3) return '$'+(n/1e3).toFixed(2)+'K'; return '$'+n.toLocaleString(undefined,{maximumFractionDigits:2}); }
+    function fmtNum(n){ if(n===null||n===undefined) return '—'; const abs=Math.abs(n); if(abs>=1e12) return (n/1e12).toFixed(2)+'T'; if(abs>=1e9) return (n/1e9).toFixed(2)+'B'; if(abs>=1e6) return (n/1e6).toFixed(2)+'M'; if(abs>=1e3) return (n/1e3).toFixed(2)+'K'; return n.toLocaleString(undefined,{maximumFractionDigits:2}); }
+    function fmtPct(n){ if(n===null||n===undefined) return '—'; const sign = n>0?'+':''; return sign + n.toFixed(1) + '%'; }
+    function paintPct(el, n){ if(!el) return; el.textContent = fmtPct(n); el.classList.remove('up','down'); if(n>0) el.classList.add('up'); else if(n<0) el.classList.add('down'); }
+
+    (async function init(){
+      const root = document.getElementById('widget');
+      const coinId = root.dataset.coinId;
+      const vs = root.dataset.vs || 'usd';
+      try {
+        // 1) Coin market data (price, changes, ranks, caps, supplies, ath)
+        const marketsURL = `https://api.coingecko.com/api/v3/coins/markets?vs_currency=${vs}&ids=${encodeURIComponent(coinId)}&sparkline=false&price_change_percentage=24h,7d,30d,1y`;
+        const [coin] = await fetchJSON(marketsURL);
+
+        if(coin){
+          document.getElementById('logo').src = coin.image;
+          document.getElementById('title').textContent = coin.name;
+          document.getElementById('price').textContent = fmtUSD(coin.current_price);
+          document.getElementById('mcap-rank').textContent = (coin.market_cap_rank ? ('#' + coin.market_cap_rank) : '—');
+          document.getElementById('mcap').textContent = fmtUSD(coin.market_cap);
+          document.getElementById('fdv').textContent = coin.fully_diluted_valuation ? fmtUSD(coin.fully_diluted_valuation) : '—';
+          document.getElementById('vol').textContent = fmtUSD(coin.total_volume);
+          document.getElementById('circ-supply').textContent = coin.circulating_supply ? fmtNum(coin.circulating_supply) : '—';
+          document.getElementById('max-supply').textContent = (coin.max_supply ? fmtNum(coin.max_supply) : 'No cap');
+          document.getElementById('circ-pct').textContent = (coin.max_supply && coin.circulating_supply) ? ((coin.circulating_supply / coin.max_supply) * 100).toFixed(1) + '%' : '—';
+          document.getElementById('ath').textContent = coin.ath ? fmtUSD(coin.ath) : '—';
+
+          // Price changes
+          paintPct(document.getElementById('chg-24h'), coin.price_change_percentage_24h_in_currency);
+          paintPct(document.getElementById('chg-7d'), coin.price_change_percentage_7d_in_currency);
+          paintPct(document.getElementById('chg-30d'), coin.price_change_percentage_30d_in_currency);
+          paintPct(document.getElementById('chg-1y'), coin.price_change_percentage_1y_in_currency);
+          // y-perf set via Year rank below
+        }
+
+        // 2) Global market cap for market share
+        const global = await fetchJSON('https://api.coingecko.com/api/v3/global');
+        const totalMcap = global?.data?.total_market_cap?.[vs];
+        if(totalMcap && coin?.market_cap){
+          const share = (coin.market_cap / totalMcap) * 100;
+          document.getElementById('mkt-share').textContent = share.toFixed(2) + '%';
+        } else {
+          document.getElementById('mkt-share').textContent = '—';
+        }
+
+        // 3) Momentum rank (30-day performance rank among top 100 by mcap)
+        try{
+          const topURL = `https://api.coingecko.com/api/v3/coins/markets?vs_currency=${vs}&order=market_cap_desc&per_page=100&page=1&sparkline=false&price_change_percentage=30d,1y`;
+          const top = await fetchJSON(topURL);
+          const list = Array.isArray(top) ? top : [];
+          const by30d = list.filter(x=>typeof x.price_change_percentage_30d_in_currency==='number')
+                            .sort((a,b)=> b.price_change_percentage_30d_in_currency - a.price_change_percentage_30d_in_currency);
+          const momPos = by30d.findIndex(x=> x.id === coinId) + 1; // 1-based
+          document.getElementById('mom-rank').textContent = momPos ? ('#' + momPos) : '—';
+
+          const by1y = list.filter(x=>typeof x.price_change_percentage_1y_in_currency==='number')
+                          .sort((a,b)=> b.price_change_percentage_1y_in_currency - a.price_change_percentage_1y_in_currency);
+          const yearPos = by1y.findIndex(x=> x.id === coinId) + 1;
+          document.getElementById('y-perf').textContent = yearPos ? ('#' + yearPos) : '—';
+         
+        }catch(e){ document.getElementById('mom-rank').textContent = '—'; document.getElementById('y-perf').textContent = '—'; }
+      }
+      catch(err){
+        console.error(err);
+        // Fill with placeholders on error
+        ['price','mcap-rank','mcap','fdv','vol','circ-supply','max-supply','circ-pct','ath','mkt-share','mom-rank','chg-24h','chg-7d','chg-30d','chg-1y','y-perf'].forEach(id=>{
+          const el=document.getElementById(id); if(el){ el.textContent='—'; }
+        });
+      }
+    })();
+  </script>
+</body>
+</html>
+```

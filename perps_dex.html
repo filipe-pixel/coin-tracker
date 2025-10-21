@@ -24,7 +24,6 @@
     .sort-controls { display: flex; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
     button { background: var(--accent); color: var(--fg); border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; }
     select { background: var(--accent); color: var(--fg); border: 1px solid #22262e; padding: 8px; border-radius: 4px; }
-    .loading { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
   </style>
 </head>
 <body>
@@ -54,8 +53,6 @@
       <button onclick="sortAndRender()">Sort</button>
     </div>
 
-    <div id="loading" class="loading">Loading live data…</div>
-
     <table>
       <thead>
         <tr>
@@ -73,7 +70,7 @@
     </table>
 
     <div class="foot">
-      <div>Token data from CoinGecko (MCAP, FDV, 24h Vol). TVL is your supplied figure. <strong>Perps 30d</strong> and <strong>OI</strong> fetched from DeFiLlama where available (late-2025).</div>
+      <div>Token data from CoinGecko (MCAP, FDV, 24h Vol). TVL, OI, and 30d Perps Vol are manual or external-source inputs (e.g., protocol dashboards / CoinGlass / DeFiLlama), as of Oct 2025.</div>
     </div>
   </div>
 
@@ -81,39 +78,21 @@
     let coinsData = [];
     let marketMap = new Map();
 
-    // —— Helpers ——————————————————————————————————————————————
-    async function fetchJSON(url){
+    async function fetchJSON(url){ 
       const proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent(url);
-      const res = await fetch(proxyUrl, { headers: { 'accept':'application/json' }, mode: 'cors' });
-      if(!res.ok) throw new Error('HTTP '+res.status+' for '+url);
-      return res.json();
+      const res = await fetch(proxyUrl, {headers:{'accept':'application/json'}, mode: 'cors'}); 
+      if(!res.ok) throw new Error('HTTP '+res.status); 
+      return res.json(); 
     }
 
     function fmtUSD(n){
-      if(n===null||n===undefined || Number.isNaN(n)) return '—';
-      const x = Number(n);
-      const abs = Math.abs(x);
-      if(abs >= 1e12) return '$'+(x/1e12).toFixed(2)+'T';
-      if(abs >= 1e9)  return '$'+(x/1e9).toFixed(2)+'B';
-      if(abs >= 1e6)  return '$'+(x/1e6).toFixed(2)+'M';
-      if(abs >= 1e3)  return '$'+(x/1e3).toFixed(2)+'K';
-      return '$'+x.toLocaleString(undefined,{maximumFractionDigits:2});
-    }
-
-    function sumLastNDays(points, n=30){
-      if(!Array.isArray(points) || points.length===0) return null;
-      let sum = 0;
-      for(let i=Math.max(0, points.length-n); i<points.length; i++){
-        const v = Number(points[i]?.value ?? points[i]?.[1] ?? 0);
-        sum += isNaN(v) ? 0 : v;
-      }
-      return sum || null;
-    }
-
-    function latestValue(points){
-      if(!Array.isArray(points) || points.length===0) return null;
-      const last = points[points.length-1];
-      return Number(last?.value ?? last?.[1] ?? null);
+      if(n===null||n===undefined) return '—';
+      const abs=Math.abs(n);
+      if(abs>=1e12) return '$'+(n/1e12).toFixed(2)+'T';
+      if(abs>=1e9) return '$'+(n/1e9).toFixed(2)+'B';
+      if(abs>=1e6) return '$'+(n/1e6).toFixed(2)+'M';
+      if(abs>=1e3) return '$'+(n/1e3).toFixed(2)+'K';
+      return '$'+Number(n).toLocaleString(undefined,{maximumFractionDigits:2});
     }
 
     function renderTable(coins) {
@@ -121,10 +100,12 @@
       tbody.innerHTML = '';
       coins.forEach(coin => {
         const market = coin.market;
+        // For protocols without tokens, show '-' in token-related fields
         const hasToken = Boolean(market);
         const marketCapCell = hasToken ? fmtUSD(market?.market_cap) : '-';
-        const fdvCell      = hasToken ? fmtUSD(market?.fully_diluted_valuation) : '-';
-        const vol24hCell  = hasToken ? fmtUSD(market?.total_volume) : '-';
+        const fdvCell = hasToken ? fmtUSD(market?.fully_diluted_valuation) : '-';
+        const vol24hCell = hasToken ? fmtUSD(market?.total_volume) : '-';
+
         const row = document.createElement('tr');
         row.innerHTML = `
           <td class="protocol"><img src="${market?.image || ''}" alt="${coin.name} logo" /><span>${coin.name}</span></td>
@@ -145,27 +126,32 @@
       const sortOrder = document.getElementById('sortOrder').value;
 
       const sorted = [...coinsData].sort((a, b) => {
-        if (sortBy === 'name') {
-          const valA = a.name || '';
-          const valB = b.name || '';
-          return sortOrder === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
-        }
         let valA, valB;
-        if (sortBy === 'foundationYear') {
+        if (sortBy === 'name') {
+          valA = a.name || '';
+          valB = b.name || '';
+          return sortOrder === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+        } else if (sortBy === 'foundationYear') {
           valA = parseInt(a.foundationYear || 0);
           valB = parseInt(b.foundationYear || 0);
         } else if (sortBy === 'tvl') {
-          valA = a.tvl || 0; valB = b.tvl || 0;
+          valA = a.tvl || 0;
+          valB = b.tvl || 0;
         } else if (sortBy === 'perps30d') {
-          valA = a.perps30d || 0; valB = b.perps30d || 0;
+          valA = a.perps30d || 0;
+          valB = b.perps30d || 0;
         } else if (sortBy === 'oi') {
-          valA = a.oi || 0; valB = b.oi || 0;
+          valA = a.oi || 0;
+          valB = b.oi || 0;
         } else if (sortBy === 'market_cap') {
-          valA = a.market?.market_cap || 0; valB = b.market?.market_cap || 0;
+          valA = a.market?.market_cap || 0;
+          valB = b.market?.market_cap || 0;
         } else if (sortBy === 'fdv') {
-          valA = a.market?.fully_diluted_valuation || 0; valB = b.market?.fully_diluted_valuation || 0;
+          valA = a.market?.fully_diluted_valuation || 0;
+          valB = b.market?.fully_diluted_valuation || 0;
         } else if (sortBy === 'volume') {
-          valA = a.market?.total_volume || 0; valB = b.market?.total_volume || 0;
+          valA = a.market?.total_volume || 0;
+          valB = b.market?.total_volume || 0;
         }
         if (isNaN(valA)) valA = 0;
         if (isNaN(valB)) valB = 0;
@@ -175,62 +161,24 @@
       renderTable(sorted);
     }
 
-    // —— DeFiLlama integration ——————————————————————————————
-    // Map your display names → DeFiLlama derivatives slugs (best guesses).
-    // If a protocol isn't on Llama yet, it will stay null and render "—".
-    const DL_SLUGS = {
-      'Hyperliquid': 'hyperliquid',
-      'Aster':       'aster',          // may be missing; falls back gracefully
-      'dYdX':        'dydx',           // derivatives dataset slug
-      'GMX':         'gmx',
-      'edgeX':       'edgex',          // may be missing; falls back gracefully
-      'Lighter':     'lighter'         // may be missing; falls back gracefully
-    };
-
-    async function fetchDLSeries(slug, dataType){
-      // dataType = 'dailyVolume' or 'openInterest'
-      // Endpoint: https://api.llama.fi/overview/derivatives/{slug}?dataType={dataType}
-      try{
-        const url = `https://api.llama.fi/overview/derivatives/${slug}?dataType=${dataType}`;
-        const json = await fetchJSON(url);
-        // Expect shape: { protocols: [ { data: [ { date, value }, ... ] } ] }
-        const series = json?.protocols?.[0]?.data;
-        if (!Array.isArray(series) || series.length === 0) return null;
-        return series;
-      }catch(e){
-        console.warn('DL fetch failed for', slug, dataType, e);
-        return null;
-      }
-    }
-
-    async function fetchDLPerps30d(slug){
-      const series = await fetchDLSeries(slug, 'dailyVolume');
-      return series ? sumLastNDays(series, 30) : null;
-    }
-
-    async function fetchDLOpenInterest(slug){
-      const series = await fetchDLSeries(slug, 'openInterest');
-      return series ? latestValue(series) : null;
-    }
-
-    // —— Init ————————————————————————————————————————————————
     (async function init(){
-      const loading = document.getElementById('loading');
       const root = document.getElementById('widget');
       const vs = root.dataset.vs || 'usd';
 
-      // TVL are your supplied numbers (can be edited here)
+      // 🔧 Fill/adjust TVL, perps30d, oi with your latest numbers (USD).
+      // If you don't have them yet, leave as null; they'll display as "—".
       const coins = [
-        { id: 'hyperliquid', name: 'Hyperliquid', foundationYear: '2023', tvl: 4787000000 },
-        { id: 'aster-2',     name: 'Aster',       foundationYear: '2025', tvl: 1891000000 },
-        { id: 'dydx-chain',  name: 'dYdX',        foundationYear: '2017', tvl: 186760000 },
-        { id: 'gmx',         name: 'GMX',         foundationYear: '2021', tvl: 558000000 },
-        { id: null,          name: 'edgeX',       foundationYear: '2024', tvl: null },
-        { id: null,          name: 'Lighter',     foundationYear: '2025', tvl: null }
+        { id: 'hyperliquid', name: 'Hyperliquid', foundationYear: '2023', tvl: 4787000000, perps30d: 313410000000, oi: 7735000000 },
+        { id: 'aster-2', name: 'Aster', foundationYear: '2025', tvl: 1891000000, perps30d: 155240000000, oi: 3239000000 },
+        { id: 'dydx-chain', name: 'dYdX', foundationYear: '2017', tvl: 186760000, perps30d: 7943000000, oi: 116170000 },
+        { id: 'gmx', name: 'GMX', foundationYear: '2021', tvl: 558000000, perps30d: 6076000000, oi: 159700000 },
+        // New additions (no listed token IDs → token columns show "-")
+        { id: null, name: 'edgeX', foundationYear: '2024', tvl: 423400000, perps30d: 135851000000, oi: 953010000 },
+        { id: null, name: 'Lighter', foundationYear: '2025', tvl: 1110000000, perps30d: 244605000000, oi: 1423000000 }
       ];
 
       try {
-        // 1) CoinGecko token markets (only for those with IDs)
+        // Fetch market data only for those that have a CoinGecko id
         const ids = coins.map(c => c.id).filter(Boolean).join(',');
         if (ids.length) {
           const marketsURL = `https://api.coingecko.com/api/v3/coins/markets?vs_currency=${vs}&ids=${encodeURIComponent(ids)}&sparkline=false&price_change_percentage=24h`;
@@ -238,35 +186,16 @@
           marketMap = new Map(marketData.map(coin => [coin.id, coin]));
         }
 
-        // 2) DeFiLlama: perps 30d and OI (best-effort, parallel)
-        // Build promises per coin where we have a DL slug.
-        const dlPromises = coins.map(async c => {
-          const slug = DL_SLUGS[c.name];
-          if (!slug) return { name: c.name, perps30d: null, oi: null };
-          const [perps30d, oi] = await Promise.all([
-            fetchDLPerps30d(slug),
-            fetchDLOpenInterest(slug)
-          ]);
-          return { name: c.name, perps30d, oi };
-        });
-
-        const dlResults = await Promise.all(dlPromises);
-        const dlMap = new Map(dlResults.map(r => [r.name, r]));
-
-        // Combine all
         coinsData = coins.map(c => ({
           ...c,
-          market: c.id ? marketMap.get(c.id) : undefined,
-          perps30d: dlMap.get(c.name)?.perps30d ?? null,
-          oi:       dlMap.get(c.name)?.oi ?? null
+          market: c.id ? marketMap.get(c.id) : undefined
         }));
 
-        loading.textContent = '';
         renderTable(coinsData);
       } catch(err){
         console.error(err);
-        loading.textContent = 'Some data failed to load (showing what we could).';
-        coinsData = coins.map(c => ({...c, market: c.id ? marketMap.get(c.id) : undefined, perps30d: null, oi: null }));
+        // Fallback: render without token data
+        coinsData = coins.map(c => ({...c, market: undefined}));
         renderTable(coinsData);
       }
     })();

@@ -8,9 +8,8 @@
     :root { --bg:transparent; --card:#1a1d22; --muted:#9aa4b2; --fg:#e8eef7; --down:#ec5c5c; --up:#3fb87f; --accent:#2e323a; }
     *{box-sizing:border-box}
     body{margin:0;background:transparent;font:14px/1.4 system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif;color:var(--fg);}
-    .card{max-width:760px;margin:24px auto;background:var(--card);border:1px solid #22262e;border-radius:0;padding:20px;box-shadow:0 10px 30px rgba(0,0,0,.25)}
+    .card{max-width:960px;margin:24px auto;background:var(--card);border:1px solid #22262e;border-radius:0;padding:20px;box-shadow:0 10px 30px rgba(0,0,0,.25)}
     header{display:flex;align-items:center;gap:14px;margin-bottom:8px}
-    header img{width:42px;height:42px}
     header h1{font-size:26px;margin:0;font-weight:700;letter-spacing:.5px}
     .section-title{font-size:18px;margin:14px 0 8px; font-weight:800}
     .hr{height:1px;background:#282c35;margin:10px 0}
@@ -22,9 +21,10 @@
     .protocol img{width:24px;height:24px;border-radius:0}
     .foot{margin-top:10px;color:#7d8897;font-size:12px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
     a{color:#9cc9ff;text-decoration:none}
-    .sort-controls { display: flex; gap: 10px; margin-bottom: 10px; }
+    .sort-controls { display: flex; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
     button { background: var(--accent); color: var(--fg); border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; }
     select { background: var(--accent); color: var(--fg); border: 1px solid #22262e; padding: 8px; border-radius: 4px; }
+    .loading { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
   </style>
 </head>
 <body>
@@ -32,13 +32,17 @@
     <header>
       <h1>Perps/Derivatives DEX Competitors Benchmark</h1>
     </header>
+
     <div class="section-title">Key Metrics</div>
     <div class="hr"></div>
+
     <div class="sort-controls">
       <select id="sortBy">
         <option value="name">Protocol</option>
         <option value="foundationYear">Est.</option>
         <option value="tvl">TVL</option>
+        <option value="perps30d">Perps Vol 30d</option>
+        <option value="oi">Open Interest</option>
         <option value="market_cap">Market Cap</option>
         <option value="fdv">FDV</option>
         <option value="volume">Volume 24h</option>
@@ -49,50 +53,88 @@
       </select>
       <button onclick="sortAndRender()">Sort</button>
     </div>
+
+    <div id="loading" class="loading">Loading live data…</div>
+
     <table>
       <thead>
         <tr>
           <th>Protocol</th>
           <th>Est.</th>
           <th>TVL</th>
+          <th>Perps Vol 30d</th>
+          <th>Open Interest</th>
           <th>Market Cap</th>
           <th>FDV</th>
           <th>Volume 24h</th>
         </tr>
       </thead>
-      <tbody id="table-body">
-        <!-- Rows will be populated here -->
-      </tbody>
+      <tbody id="table-body"></tbody>
     </table>
+
     <div class="foot">
-      <div>Data from CoinGecko (MCAP, FDV, VOL) and DefiLlama (TVL, as of October 20, 2025).</div>
+      <div>Token data from CoinGecko (MCAP, FDV, 24h Vol). TVL is your supplied figure. <strong>Perps 30d</strong> and <strong>OI</strong> fetched from DeFiLlama where available (late-2025).</div>
     </div>
   </div>
+
   <script>
     let coinsData = [];
     let marketMap = new Map();
 
-    async function fetchJSON(url){ 
+    // —— Helpers ——————————————————————————————————————————————
+    async function fetchJSON(url){
       const proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent(url);
-      const res = await fetch(proxyUrl, {headers:{'accept':'application/json'}, mode: 'cors'}); 
-      if(!res.ok) throw new Error('HTTP '+res.status); 
-      return res.json(); 
+      const res = await fetch(proxyUrl, { headers: { 'accept':'application/json' }, mode: 'cors' });
+      if(!res.ok) throw new Error('HTTP '+res.status+' for '+url);
+      return res.json();
     }
-    function fmtUSD(n){ if(n===null||n===undefined) return '—'; const abs=Math.abs(n); if(abs>=1e12) return '$'+(n/1e12).toFixed(2)+'T'; if(abs>=1e9) return '$'+(n/1e9).toFixed(2)+'B'; if(abs>=1e6) return '$'+(n/1e6).toFixed(2)+'M'; if(abs>=1e3) return '$'+(n/1e3).toFixed(2)+'K'; return '$'+n.toLocaleString(undefined,{maximumFractionDigits:2}); }
+
+    function fmtUSD(n){
+      if(n===null||n===undefined || Number.isNaN(n)) return '—';
+      const x = Number(n);
+      const abs = Math.abs(x);
+      if(abs >= 1e12) return '$'+(x/1e12).toFixed(2)+'T';
+      if(abs >= 1e9)  return '$'+(x/1e9).toFixed(2)+'B';
+      if(abs >= 1e6)  return '$'+(x/1e6).toFixed(2)+'M';
+      if(abs >= 1e3)  return '$'+(x/1e3).toFixed(2)+'K';
+      return '$'+x.toLocaleString(undefined,{maximumFractionDigits:2});
+    }
+
+    function sumLastNDays(points, n=30){
+      if(!Array.isArray(points) || points.length===0) return null;
+      let sum = 0;
+      for(let i=Math.max(0, points.length-n); i<points.length; i++){
+        const v = Number(points[i]?.value ?? points[i]?.[1] ?? 0);
+        sum += isNaN(v) ? 0 : v;
+      }
+      return sum || null;
+    }
+
+    function latestValue(points){
+      if(!Array.isArray(points) || points.length===0) return null;
+      const last = points[points.length-1];
+      return Number(last?.value ?? last?.[1] ?? null);
+    }
 
     function renderTable(coins) {
       const tbody = document.getElementById('table-body');
       tbody.innerHTML = '';
       coins.forEach(coin => {
         const market = coin.market;
+        const hasToken = Boolean(market);
+        const marketCapCell = hasToken ? fmtUSD(market?.market_cap) : '-';
+        const fdvCell      = hasToken ? fmtUSD(market?.fully_diluted_valuation) : '-';
+        const vol24hCell  = hasToken ? fmtUSD(market?.total_volume) : '-';
         const row = document.createElement('tr');
         row.innerHTML = `
           <td class="protocol"><img src="${market?.image || ''}" alt="${coin.name} logo" /><span>${coin.name}</span></td>
           <td>${coin.foundationYear || '—'}</td>
           <td>${fmtUSD(coin.tvl)}</td>
-          <td>${fmtUSD(market?.market_cap)}</td>
-          <td>${fmtUSD(market?.fully_diluted_valuation)}</td>
-          <td>${fmtUSD(market?.total_volume)}</td>
+          <td>${fmtUSD(coin.perps30d)}</td>
+          <td>${fmtUSD(coin.oi)}</td>
+          <td>${marketCapCell}</td>
+          <td>${fdvCell}</td>
+          <td>${vol24hCell}</td>
         `;
         tbody.appendChild(row);
       });
@@ -101,73 +143,131 @@
     function sortAndRender() {
       const sortBy = document.getElementById('sortBy').value;
       const sortOrder = document.getElementById('sortOrder').value;
+
       const sorted = [...coinsData].sort((a, b) => {
-        let valA, valB;
         if (sortBy === 'name') {
-          valA = a.name || '';
-          valB = b.name || '';
+          const valA = a.name || '';
+          const valB = b.name || '';
           return sortOrder === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
-        } else if (sortBy === 'foundationYear') {
+        }
+        let valA, valB;
+        if (sortBy === 'foundationYear') {
           valA = parseInt(a.foundationYear || 0);
           valB = parseInt(b.foundationYear || 0);
         } else if (sortBy === 'tvl') {
-          valA = a.tvl || 0;
-          valB = b.tvl || 0;
+          valA = a.tvl || 0; valB = b.tvl || 0;
+        } else if (sortBy === 'perps30d') {
+          valA = a.perps30d || 0; valB = b.perps30d || 0;
+        } else if (sortBy === 'oi') {
+          valA = a.oi || 0; valB = b.oi || 0;
         } else if (sortBy === 'market_cap') {
-          valA = a.market?.market_cap || 0;
-          valB = b.market?.market_cap || 0;
+          valA = a.market?.market_cap || 0; valB = b.market?.market_cap || 0;
         } else if (sortBy === 'fdv') {
-          valA = a.market?.fully_diluted_valuation || 0;
-          valB = b.market?.fully_diluted_valuation || 0;
+          valA = a.market?.fully_diluted_valuation || 0; valB = b.market?.fully_diluted_valuation || 0;
         } else if (sortBy === 'volume') {
-          valA = a.market?.total_volume || 0;
-          valB = b.market?.total_volume || 0;
+          valA = a.market?.total_volume || 0; valB = b.market?.total_volume || 0;
         }
         if (isNaN(valA)) valA = 0;
         if (isNaN(valB)) valB = 0;
         return sortOrder === 'asc' ? valA - valB : valB - valA;
       });
+
       renderTable(sorted);
     }
 
+    // —— DeFiLlama integration ——————————————————————————————
+    // Map your display names → DeFiLlama derivatives slugs (best guesses).
+    // If a protocol isn't on Llama yet, it will stay null and render "—".
+    const DL_SLUGS = {
+      'Hyperliquid': 'hyperliquid',
+      'Aster':       'aster',          // may be missing; falls back gracefully
+      'dYdX':        'dydx',           // derivatives dataset slug
+      'GMX':         'gmx',
+      'edgeX':       'edgex',          // may be missing; falls back gracefully
+      'Lighter':     'lighter'         // may be missing; falls back gracefully
+    };
+
+    async function fetchDLSeries(slug, dataType){
+      // dataType = 'dailyVolume' or 'openInterest'
+      // Endpoint: https://api.llama.fi/overview/derivatives/{slug}?dataType={dataType}
+      try{
+        const url = `https://api.llama.fi/overview/derivatives/${slug}?dataType=${dataType}`;
+        const json = await fetchJSON(url);
+        // Expect shape: { protocols: [ { data: [ { date, value }, ... ] } ] }
+        const series = json?.protocols?.[0]?.data;
+        if (!Array.isArray(series) || series.length === 0) return null;
+        return series;
+      }catch(e){
+        console.warn('DL fetch failed for', slug, dataType, e);
+        return null;
+      }
+    }
+
+    async function fetchDLPerps30d(slug){
+      const series = await fetchDLSeries(slug, 'dailyVolume');
+      return series ? sumLastNDays(series, 30) : null;
+    }
+
+    async function fetchDLOpenInterest(slug){
+      const series = await fetchDLSeries(slug, 'openInterest');
+      return series ? latestValue(series) : null;
+    }
+
+    // —— Init ————————————————————————————————————————————————
     (async function init(){
+      const loading = document.getElementById('loading');
       const root = document.getElementById('widget');
       const vs = root.dataset.vs || 'usd';
-      const coins = [
-        { id: 'hyperliquid', name: 'Hyperliquid', slug: 'hyperliquid', foundationYear: '2023', tvl: 4787000000 },
-        { id: 'aster-2', name: 'Aster', slug: 'aster', foundationYear: '2025', tvl: 1891000000 },
-        { id: 'dydx-chain', name: 'dYdX', slug: 'dydx-v4', foundationYear: '2017', tvl: 186760000 },
-        { id: 'gmx', name: 'GMX', slug: 'gmx', foundationYear: '2021', tvl: 558000000 }
-      ];
-      try {
-        // Fetch market data for all coins
-        const ids = coins.map(c => c.id).filter(id => id).join(',');
-        const marketsURL = `https://api.coingecko.com/api/v3/coins/markets?vs_currency=${vs}&ids=${encodeURIComponent(ids)}&sparkline=false&price_change_percentage=24h`;
-        const marketData = await fetchJSON(marketsURL);
-        marketMap = new Map(marketData.map(coin => [coin.id, coin]));
 
+      // TVL are your supplied numbers (can be edited here)
+      const coins = [
+        { id: 'hyperliquid', name: 'Hyperliquid', foundationYear: '2023', tvl: 4787000000 },
+        { id: 'aster-2',     name: 'Aster',       foundationYear: '2025', tvl: 1891000000 },
+        { id: 'dydx-chain',  name: 'dYdX',        foundationYear: '2017', tvl: 186760000 },
+        { id: 'gmx',         name: 'GMX',         foundationYear: '2021', tvl: 558000000 },
+        { id: null,          name: 'edgeX',       foundationYear: '2024', tvl: null },
+        { id: null,          name: 'Lighter',     foundationYear: '2025', tvl: null }
+      ];
+
+      try {
+        // 1) CoinGecko token markets (only for those with IDs)
+        const ids = coins.map(c => c.id).filter(Boolean).join(',');
+        if (ids.length) {
+          const marketsURL = `https://api.coingecko.com/api/v3/coins/markets?vs_currency=${vs}&ids=${encodeURIComponent(ids)}&sparkline=false&price_change_percentage=24h`;
+          const marketData = await fetchJSON(marketsURL);
+          marketMap = new Map(marketData.map(coin => [coin.id, coin]));
+        }
+
+        // 2) DeFiLlama: perps 30d and OI (best-effort, parallel)
+        // Build promises per coin where we have a DL slug.
+        const dlPromises = coins.map(async c => {
+          const slug = DL_SLUGS[c.name];
+          if (!slug) return { name: c.name, perps30d: null, oi: null };
+          const [perps30d, oi] = await Promise.all([
+            fetchDLPerps30d(slug),
+            fetchDLOpenInterest(slug)
+          ]);
+          return { name: c.name, perps30d, oi };
+        });
+
+        const dlResults = await Promise.all(dlPromises);
+        const dlMap = new Map(dlResults.map(r => [r.name, r]));
+
+        // Combine all
         coinsData = coins.map(c => ({
           ...c,
-          market: marketMap.get(c.id)
+          market: c.id ? marketMap.get(c.id) : undefined,
+          perps30d: dlMap.get(c.name)?.perps30d ?? null,
+          oi:       dlMap.get(c.name)?.oi ?? null
         }));
 
+        loading.textContent = '';
         renderTable(coinsData);
       } catch(err){
         console.error(err);
-        // Fill with placeholders on error
-        const tbody = document.getElementById('table-body');
-        coins.forEach(coin => {
-          const row = document.createElement('tr');
-          row.innerHTML = `
-            <td class="protocol"><img src="" alt="${coin.name} logo" /><span>${coin.name}</span></td>
-            <td>${coin.foundationYear || '—'}</td>
-            <td>${fmtUSD(coin.tvl)}</td>
-            <td>—</td>
-            <td>—</td>
-            <td>—</td>
-          `;
-          tbody.appendChild(row);
-        });
+        loading.textContent = 'Some data failed to load (showing what we could).';
+        coinsData = coins.map(c => ({...c, market: c.id ? marketMap.get(c.id) : undefined, perps30d: null, oi: null }));
+        renderTable(coinsData);
       }
     })();
   </script>
